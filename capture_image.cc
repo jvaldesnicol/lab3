@@ -46,37 +46,87 @@ int main(void) {
 
     // Calculate the virtual address where our device is mapped
     video_in_dma = (unsigned int *)(virtual_base + ((VIDEO_BASE) & (HW_REGS_MASK)));
+    key_ptr = (unsigned int *)(virtual_base + ((PUSH_BASE) & (HW_REGS_MASK)));
 
+    unsigned short pixels[IMAGE_HEIGHT][IMAGE_WIDTH];
+    unsigned short pixels_bw[IMAGE_HEIGHT][IMAGE_WIDTH];
 
-   
-
-    int value = *(video_in_dma+3);
+    // Read the value from the video_in_dma register
+    int value = *(video_in_dma+3); // read the updated value from the video_in_dma register
 
     printf("Video In DMA register updated at:0%x\n",(video_in_dma));
 
     // Modify the PIO register
-    *(video_in_dma+3) = 0x4;
-    //*h2p_lw_led_addr = *h2p_lw_led_addr + 1;
+    *(video_in_dma+3) = 0x4; // enable video
 
+    // Read the updated value from the video_in_dma register
     value = *(video_in_dma+3);
 
     printf("enabled video:0x%x\n",value);
 
+    // Button press
 
-    
+    while (1) {
+        if (*key_ptr != 0x07) { // when botton is pressed
+            *(video_in_dma+3) = 0x00; // disable video 
+            while (*key_ptr != 0x07); // wait until button is released
+            break;  // exit the loop
+        }
+    }
 
+    value = *(video_in_dma+3); // read the updated value from the video_in_dma register
+    printf("disabled video:0x%x\n",value);
 
+    // Set image virtual_base (mmap used to map into virtual memory)
+    virtual_base = mmap(NULL, IMAGE_SPAN, (PROT_READ | PROT_WRITE), MAP_SHARED, fd, FPGA_ONCHIP_BASE);
+    if (virtual_base == MAP_FAILED) {
+        printf("ERROR: mmap() failed...\n");
+        close(fd);
+        return 1;
+    }
 
-    //change 
+    video_mem = (unsigned short *)(virtual_base + ((FPGA_ONCHIP_BASE) & (IMAGE_MASK)));
+
+    // Get black/white threshold
+    int x; 
+    int y;
+    int sum = 0; // Sum of all pixel values
+    for (y = 0; y < IMAGE_HEIGHT; y++) {
+        for (x = 0; x < IMAGE_WIDTH; x++) {
+            unsigned short pixel = *(video_mem + (y << 9) + x); // Read pixel data
+            int red = (pixel >> 11) & 0x1F; // Extract the color components
+            int green = (pixel >> 5) & 0x3F;
+            int blue = pixel & 0x1F;
+            int gray = (red + 2*green + blue) / 4;
+            sum += gray;
+        }
+    }
+    int t = sum / (IMAGE_HEIGHT * IMAGE_WIDTH); // Threshold value
+
+    for (y = 0; y < IMAGE_HEIGHT; y++) {
+        for (x = 0; x < IMAGE_WIDTH; x++) {
+            unsigned short pixel = *(video_mem + (y << 9) + x); // Read pixel data
+            pixels[y][x] = pixel; 
+            // Get black/white pixel
+            int red = (pixel >> 11) & 0x1F; // Extract the color components
+            int green = (pixel >> 5) & 0x3F;
+            int blue = pixel & 0x1F;
+            int gray = (red + 2*green + blue) / 4;
+            if (gray > t) {
+                pixels_bw[y][x] = 0xFFFF; // White
+            } else {
+                pixels_bw[y][x] = 0x0000; // Black
+            }
+        }
+    }
+
+    // Save image as color
     const char* filename = "final_image_color.bmp";
+    saveImageShort(filename,&pixels[0][0],320,240);
 
-    // Saving image as color
-    //saveImageShort(filename,&pixels[0][0],320,240);
-
+    // Save image as black and white
     const char* filename1 = "final_image_bw.bmp";
-    //saving image as black and white
-    //saveImageGrayscale(filename1,&pixels_bw[0][0],320,240);
-
+    saveImageShort(filename1,&pixels_bw[0][0],320,240);
 
     // Clean up
     if (munmap(virtual_base, IMAGE_SPAN) != 0) {
@@ -84,8 +134,6 @@ int main(void) {
         close(fd);
         return 1;
     }
-
-
 
     close(fd);
     return 0;
