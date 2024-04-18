@@ -97,7 +97,7 @@ int main(void) {
             int red = (pixel >> 11) & 0x1F; // Extract the color components
             int green = (pixel >> 5) & 0x3F;
             int blue = pixel & 0x1F;
-            int gray = (red + 2*green + blue) / 4;
+            int gray = (red + green + blue) / 3;
             sum += gray;
         }
     }
@@ -111,7 +111,7 @@ int main(void) {
             int red = (pixel >> 11) & 0x1F; // Extract the color components
             int green = (pixel >> 5) & 0x3F;
             int blue = pixel & 0x1F;
-            int gray = (red + 2*green + blue) / 4;
+            int gray = (red + green + blue) / 3;
             if (gray > t) {
                 pixels_bw[y][x] = 0xFFFF; // White
             } else {
