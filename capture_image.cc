@@ -90,7 +90,7 @@ int main(void) {
     // Get black/white threshold
     int x; 
     int y;
-    int sum = 0; // Sum of all pixel values
+    int sum = 0; // Sum of all gray scaled pixel values
     for (y = 0; y < IMAGE_HEIGHT; y++) {
         for (x = 0; x < IMAGE_WIDTH; x++) {
             unsigned short pixel = *(video_mem + (y << 9) + x); // Read pixel data
